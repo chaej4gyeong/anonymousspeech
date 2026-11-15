@@ -51,11 +51,8 @@ local ActiveGenerators = {}
 local LastUpdateTick = 0
 local LastFullESPRefresh = 0
 
--- Untuk auto skill check (baru)
 local HeartbeatConnection = nil
 local VisibilityConnection = nil
-
--- Gui utama untuk indikator
 local IndicatorGui = nil
 
 -- ================================
@@ -111,7 +108,7 @@ local function CreateBillboardTag(text, color, size, textSize)
 end
 
 -- ================================
--- GUI SETUP
+-- GUI SETUP (CROSSHAIR + INDIKATOR)
 -- ================================
 
 local function SetupGui()
@@ -123,6 +120,21 @@ local function SetupGui()
     IndicatorGui.IgnoreGuiInset = true
     IndicatorGui.DisplayOrder = 999
     IndicatorGui.Parent = PlayerGui
+
+    -- [CROSSHAIR] titik bulat di tengah layar
+    local crosshair = Instance.new("Frame")
+    crosshair.Name = "Crosshair"
+    crosshair.Size = UDim2.new(0, 6, 0, 6)
+    crosshair.Position = UDim2.new(0.5, -3, 0.5, -3)
+    crosshair.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    crosshair.BackgroundTransparency = 0
+    crosshair.BorderSizePixel = 0
+    crosshair.ZIndex = 9999
+    crosshair.Parent = IndicatorGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = crosshair
 end
 
 -- ================================
@@ -146,6 +158,7 @@ local function updatePlayerNametag(player)
 
     local teamName = (player.Team and player.Team.Name:lower()) or ""
     local selectedKillerAttr = GetGameValue(player, "SelectedKiller")
+    local rawMask = GetGameValue(player, "Mask") or GetGameValue(player.Character, "Mask")
     local isKnocked = GetGameValue(player.Character, "Knocked")
     local isHooked = GetGameValue(player.Character, "IsHooked")
     local isChased = GetGameValue(player.Character, "IsChased")
@@ -187,8 +200,35 @@ local function updatePlayerNametag(player)
 
     ApplyHighlight(player.Character, color)
 
-    local maskHook = rootPart:FindFirstChild("MaskHook")
-    if maskHook then maskHook:Destroy() end
+    -- [MASK] tampilkan jenis mask killer
+    local hasMask = false
+    if isKiller and selectedKillerAttr and string.match(tostring(selectedKillerAttr):lower(), "masked") and rawMask then
+        local searchMask = tostring(rawMask):lower()
+        for key, name in pairs(MaskNames) do
+            if key:lower() == searchMask then
+                hasMask = true
+                local maskBillboard = rootPart:FindFirstChild("MaskHook")
+                if not maskBillboard then
+                    maskBillboard = CreateBillboardTag(name, MaskColors[key] or Color3.new(1,1,1), UDim2.new(0, 100, 0, 20), 12)
+                    maskBillboard.Name = "MaskHook"
+                    maskBillboard.StudsOffset = Vector3.new(0, 3, 0)
+                    maskBillboard.Adornee = rootPart
+                    maskBillboard.Parent = rootPart
+                else
+                    local lbl = maskBillboard:FindFirstChild("BitchHook") or maskBillboard:FindFirstChildOfClass("TextLabel")
+                    if lbl then
+                        lbl.Text = name
+                        lbl.TextColor3 = MaskColors[key] or Color3.new(1,1,1)
+                    end
+                end
+                break
+            end
+        end
+    end
+    if not hasMask then
+        local maskBillboard = rootPart:FindFirstChild("MaskHook")
+        if maskBillboard then maskBillboard:Destroy() end
+    end
 
     local chasedLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Chased")
     if isChased then
@@ -390,7 +430,7 @@ local function RefreshESP()
 end
 
 -- ================================
--- AUTO SKILL CHECK (VERSI BARU - PRESISI TINGGI)
+-- AUTO SKILL CHECK
 -- ================================
 
 local function StartSkillCheckLogic()
@@ -454,7 +494,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     if VisibilityConnection then VisibilityConnection:Disconnect() end
     SetupGui()
     task.wait(1)
-    -- Skill check sudah diinisialisasi di StartSkillCheckLogic, tidak perlu panggil lagi
 end)
 
 RunService.Heartbeat:Connect(function()
@@ -533,4 +572,4 @@ end)
 -- ================================
 SetupGui()
 RefreshESP()
-StartSkillCheckLogic()  -- <-- DI SINI skill check baru dijalankan
+StartSkillCheckLogic()
